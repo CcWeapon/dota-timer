@@ -67,17 +67,16 @@ namespace DotaTimer
             MaximumSize = new Size(570, 88);
             TopMost = topMostEnabled;
             FormBorderStyle = FormBorderStyle.None;
-            BackColor = Color.Magenta;
-            TransparencyKey = Color.Magenta;
+            BackColor = Color.FromArgb(20, 24, 28);
             ForeColor = Color.White;
             Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
-            Opacity = 1.0;
+            Opacity = 0.92;
             DoubleBuffered = true;
 
             Panel header = new Panel();
             header.Dock = DockStyle.Top;
             header.Height = 28;
-            header.BackColor = Color.Transparent;
+            header.BackColor = Color.FromArgb(36, 42, 50);
             header.MouseDown += DragMouseDown;
             header.MouseMove += DragMouseMove;
             header.MouseUp += DragMouseUp;
@@ -86,7 +85,6 @@ namespace DotaTimer
             Label title = new Label();
             title.Text = "Dota Timer";
             title.ForeColor = Color.FromArgb(245, 201, 95);
-            title.BackColor = Color.Transparent;
             title.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point);
             title.AutoSize = true;
             title.Location = new Point(10, 6);
@@ -137,7 +135,6 @@ namespace DotaTimer
             timeLabel.TextAlign = ContentAlignment.MiddleCenter;
             timeLabel.Font = new Font("Consolas", 27F, FontStyle.Bold, GraphicsUnit.Point);
             timeLabel.ForeColor = Color.FromArgb(110, 233, 183);
-            timeLabel.BackColor = Color.Transparent;
             timeLabel.Location = new Point(6, 29);
             timeLabel.Size = new Size(126, 48);
             timeLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
@@ -150,7 +147,6 @@ namespace DotaTimer
             statusLabel.Text = "已置顶 | 可拖动窗口";
             statusLabel.TextAlign = ContentAlignment.MiddleLeft;
             statusLabel.ForeColor = Color.FromArgb(180, 190, 200);
-            statusLabel.BackColor = Color.Transparent;
             statusLabel.Font = new Font("Microsoft YaHei UI", 8F, FontStyle.Regular, GraphicsUnit.Point);
             statusLabel.Location = new Point(142, 59);
             statusLabel.Size = new Size(360, 18);
@@ -160,7 +156,6 @@ namespace DotaTimer
             Label startLabel = new Label();
             startLabel.Text = "初始时间";
             startLabel.AutoSize = true;
-            startLabel.BackColor = Color.Transparent;
             startLabel.Location = new Point(142, 38);
             Controls.Add(startLabel);
 
@@ -178,7 +173,6 @@ namespace DotaTimer
             Label colonLabel = new Label();
             colonLabel.Text = "分";
             colonLabel.AutoSize = true;
-            colonLabel.BackColor = Color.Transparent;
             colonLabel.Location = new Point(258, 38);
             Controls.Add(colonLabel);
 
@@ -196,7 +190,6 @@ namespace DotaTimer
             Label secLabel = new Label();
             secLabel.Text = "秒";
             secLabel.AutoSize = true;
-            secLabel.BackColor = Color.Transparent;
             secLabel.Location = new Point(326, 38);
             Controls.Add(secLabel);
 
@@ -566,5 +559,4 @@ namespace DotaTimer
         }
     }
 }
-
 
