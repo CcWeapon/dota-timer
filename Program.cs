@@ -1,54 +1,56 @@
 using System;
-using System.Drawing;
 using System.Media;
 using System.Runtime.InteropServices;
-using System.Windows.Forms;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+using Forms = System.Windows.Forms;
+using Drawing = System.Drawing;
 
 namespace DotaTimer
 {
-    static class Program
+    public class AppEntry : Application
     {
         [STAThread]
-        static void Main()
+        public static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new TimerForm());
+            AppEntry app = new AppEntry();
+            app.Run(new TimerWindow());
         }
     }
 
-    public class TimerForm : Form
+    public class TimerWindow : Window
     {
-        private readonly Label timeLabel;
-        private readonly Label statusLabel;
+        private readonly Border outerBorder;
+        private readonly Border headerBorder;
+        private readonly TextBlock timeText;
+        private readonly TextBlock statusText;
         private readonly Button minimizeButton;
         private readonly Button pinButton;
         private readonly Button startButton;
         private readonly Button resetButton;
-        private readonly NumericUpDown minInput;
-        private readonly NumericUpDown secInput;
-        private readonly HScrollBar opacitySlider;
-        private readonly Timer uiTimer;
-        private readonly ToolTip tips;
-        private readonly NotifyIcon trayIcon;
-        private readonly ToolStripMenuItem trayClickThroughItem;
-        private readonly ToolStripMenuItem trayMinute40BeepItem;
-        private readonly ToolStripMenuItem trayRuneVoiceItem;
-        private readonly ToolStripMenuItem trayXpVoiceItem;
+        private readonly TextBox minInput;
+        private readonly TextBox secInput;
+        private readonly Slider opacitySlider;
+        private readonly DispatcherTimer uiTimer;
+        private readonly Forms.NotifyIcon trayIcon;
+        private readonly Forms.ToolStripMenuItem trayClickThroughItem;
+        private readonly Forms.ToolStripMenuItem trayMinute40VoiceItem;
+        private readonly Forms.ToolStripMenuItem trayRuneVoiceItem;
+        private readonly Forms.ToolStripMenuItem trayXpVoiceItem;
 
         private bool running;
         private bool topMostEnabled = true;
         private bool clickThroughEnabled;
-        private bool hoverBorderVisible;
-        private bool minute40BeepEnabled = true;
+        private bool minute40VoiceEnabled = true;
         private bool runeVoiceEnabled = true;
         private bool xpVoiceEnabled = true;
         private DateTime startedAt;
         private int initialSeconds;
         private int lastSecond = -1;
-        private Point dragMouseStart;
-        private Point dragFormStart;
-        private bool dragging;
 
         private const int WS_EX_TRANSPARENT = 0x20;
         private const int GWL_EXSTYLE = -20;
@@ -59,221 +61,194 @@ namespace DotaTimer
         [DllImport("user32.dll")]
         private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 
-        public TimerForm()
+        public TimerWindow()
         {
-            Text = "Dota Timer";
-            StartPosition = FormStartPosition.CenterScreen;
-            Size = new Size(520, 82);
-            MinimumSize = new Size(420, 78);
-            MaximumSize = new Size(570, 88);
-            TopMost = topMostEnabled;
-            FormBorderStyle = FormBorderStyle.None;
-            BackColor = Color.FromArgb(20, 24, 28);
-            ForeColor = Color.White;
-            Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
-            Opacity = 0.92;
-            DoubleBuffered = true;
+            Title = "Dota Timer";
+            Width = 520;
+            Height = 82;
+            MinWidth = 420;
+            MinHeight = 78;
+            MaxWidth = 570;
+            MaxHeight = 88;
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            AllowsTransparency = true;
+            Background = Brushes.Transparent;
+            Topmost = topMostEnabled;
+            ShowInTaskbar = true;
+            FontFamily = new FontFamily("Microsoft YaHei UI");
+            FontSize = 12;
 
-            Panel header = new Panel();
-            header.Dock = DockStyle.Top;
-            header.Height = 28;
-            header.BackColor = Color.FromArgb(36, 42, 50);
-            header.MouseDown += DragMouseDown;
-            header.MouseMove += DragMouseMove;
-            header.MouseUp += DragMouseUp;
-            Controls.Add(header);
+            outerBorder = new Border();
+            outerBorder.CornerRadius = new CornerRadius(4);
+            outerBorder.BorderThickness = new Thickness(2);
+            outerBorder.BorderBrush = Brushes.Transparent;
+            Content = outerBorder;
 
-            Label title = new Label();
+            Canvas canvas = new Canvas();
+            outerBorder.Child = canvas;
+
+            headerBorder = new Border();
+            headerBorder.Height = 28;
+            headerBorder.Width = Width;
+            headerBorder.CornerRadius = new CornerRadius(4, 4, 0, 0);
+            headerBorder.MouseLeftButtonDown += DragWindow;
+            canvas.Children.Add(headerBorder);
+            Canvas.SetLeft(headerBorder, 0);
+            Canvas.SetTop(headerBorder, 0);
+
+            TextBlock title = new TextBlock();
             title.Text = "Dota Timer";
-            title.ForeColor = Color.FromArgb(245, 201, 95);
-            title.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold, GraphicsUnit.Point);
-            title.AutoSize = true;
-            title.Location = new Point(10, 6);
-            title.MouseDown += DragMouseDown;
-            title.MouseMove += DragMouseMove;
-            title.MouseUp += DragMouseUp;
-            header.Controls.Add(title);
+            title.Foreground = new SolidColorBrush(Color.FromRgb(245, 201, 95));
+            title.FontFamily = new FontFamily("Segoe UI Semibold");
+            title.FontWeight = FontWeights.Bold;
+            title.FontSize = 12;
+            title.MouseLeftButtonDown += DragWindow;
+            canvas.Children.Add(title);
+            Canvas.SetLeft(title, 10);
+            Canvas.SetTop(title, 6);
 
-            Label opacityLabel = new Label();
+            TextBlock opacityLabel = new TextBlock();
             opacityLabel.Text = "透明";
-            opacityLabel.ForeColor = Color.FromArgb(210, 216, 224);
-            opacityLabel.AutoSize = true;
-            opacityLabel.Location = new Point(118, 7);
-            opacityLabel.MouseDown += DragMouseDown;
-            opacityLabel.MouseMove += DragMouseMove;
-            opacityLabel.MouseUp += DragMouseUp;
-            header.Controls.Add(opacityLabel);
+            opacityLabel.Foreground = new SolidColorBrush(Color.FromRgb(210, 216, 224));
+            opacityLabel.FontSize = 12;
+            opacityLabel.MouseLeftButtonDown += DragWindow;
+            canvas.Children.Add(opacityLabel);
+            Canvas.SetLeft(opacityLabel, 118);
+            Canvas.SetTop(opacityLabel, 6);
 
-            opacitySlider = new HScrollBar();
+            opacitySlider = new Slider();
             opacitySlider.Minimum = 45;
-            opacitySlider.Maximum = 109;
-            opacitySlider.LargeChange = 10;
-            opacitySlider.SmallChange = 5;
+            opacitySlider.Maximum = 100;
             opacitySlider.Value = 92;
-            opacitySlider.Size = new Size(120, 16);
-            opacitySlider.Location = new Point(156, 6);
-            opacitySlider.Scroll += delegate { ApplyOpacityFromSlider(); };
-            header.Controls.Add(opacitySlider);
+            opacitySlider.Width = 120;
+            opacitySlider.Height = 18;
+            opacitySlider.TickFrequency = 5;
+            opacitySlider.IsSnapToTickEnabled = false;
+            opacitySlider.ValueChanged += delegate { ApplyBackgroundOpacity(); };
+            canvas.Children.Add(opacitySlider);
+            Canvas.SetLeft(opacitySlider, 156);
+            Canvas.SetTop(opacitySlider, 5);
 
-            minimizeButton = new Button();
-            minimizeButton.Text = "_";
-            minimizeButton.FlatStyle = FlatStyle.Flat;
-            minimizeButton.FlatAppearance.BorderSize = 0;
-            minimizeButton.BackColor = Color.FromArgb(62, 68, 76);
-            minimizeButton.ForeColor = Color.White;
-            minimizeButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
-            minimizeButton.Size = new Size(30, 24);
-            minimizeButton.Location = new Point(396, 2);
-            minimizeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            minimizeButton = MakeHeaderButton("_", Color.FromRgb(62, 68, 76));
             minimizeButton.Click += delegate { MinimizeToTray(); };
-            header.Controls.Add(minimizeButton);
+            canvas.Children.Add(minimizeButton);
+            Canvas.SetLeft(minimizeButton, 396);
+            Canvas.SetTop(minimizeButton, 2);
 
-            pinButton = new Button();
-            pinButton.Text = "钉";
-            pinButton.FlatStyle = FlatStyle.Flat;
-            pinButton.FlatAppearance.BorderSize = 0;
-            pinButton.ForeColor = Color.White;
-            pinButton.Size = new Size(30, 24);
-            pinButton.Location = new Point(430, 2);
-            pinButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            pinButton = MakeHeaderButton("钉", Color.FromRgb(126, 86, 22));
             pinButton.Click += delegate { ToggleTopMost(); };
-            header.Controls.Add(pinButton);
+            canvas.Children.Add(pinButton);
+            Canvas.SetLeft(pinButton, 430);
+            Canvas.SetTop(pinButton, 2);
 
-            Button closeButton = new Button();
-            closeButton.Text = "X";
-            closeButton.FlatStyle = FlatStyle.Flat;
-            closeButton.FlatAppearance.BorderSize = 0;
-            closeButton.BackColor = Color.FromArgb(70, 48, 48);
-            closeButton.ForeColor = Color.White;
-            closeButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
-            closeButton.Size = new Size(30, 24);
-            closeButton.Location = new Point(464, 2);
-            closeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            Button closeButton = MakeHeaderButton("X", Color.FromRgb(70, 48, 48));
             closeButton.Click += delegate { Close(); };
-            header.Controls.Add(closeButton);
+            canvas.Children.Add(closeButton);
+            Canvas.SetLeft(closeButton, 464);
+            Canvas.SetTop(closeButton, 2);
 
-            timeLabel = new Label();
-            timeLabel.Text = "00:00";
-            timeLabel.TextAlign = ContentAlignment.MiddleCenter;
-            timeLabel.Font = new Font("Consolas", 27F, FontStyle.Bold, GraphicsUnit.Point);
-            timeLabel.ForeColor = Color.FromArgb(110, 233, 183);
-            timeLabel.Location = new Point(6, 29);
-            timeLabel.Size = new Size(126, 48);
-            timeLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-            timeLabel.MouseDown += DragMouseDown;
-            timeLabel.MouseMove += DragMouseMove;
-            timeLabel.MouseUp += DragMouseUp;
-            Controls.Add(timeLabel);
+            timeText = new TextBlock();
+            timeText.Text = "00:00";
+            timeText.Foreground = new SolidColorBrush(Color.FromRgb(110, 233, 183));
+            timeText.FontFamily = new FontFamily("Consolas");
+            timeText.FontWeight = FontWeights.Bold;
+            timeText.FontSize = 36;
+            timeText.Width = 126;
+            timeText.Height = 48;
+            timeText.TextAlignment = TextAlignment.Center;
+            timeText.MouseLeftButtonDown += DragWindow;
+            canvas.Children.Add(timeText);
+            Canvas.SetLeft(timeText, 6);
+            Canvas.SetTop(timeText, 28);
 
-            statusLabel = new Label();
-            statusLabel.Text = "已置顶 | 可拖动窗口";
-            statusLabel.TextAlign = ContentAlignment.MiddleLeft;
-            statusLabel.ForeColor = Color.FromArgb(180, 190, 200);
-            statusLabel.Font = new Font("Microsoft YaHei UI", 8F, FontStyle.Regular, GraphicsUnit.Point);
-            statusLabel.Location = new Point(142, 59);
-            statusLabel.Size = new Size(360, 18);
-            statusLabel.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            Controls.Add(statusLabel);
-
-            Label startLabel = new Label();
+            TextBlock startLabel = new TextBlock();
             startLabel.Text = "初始时间";
-            startLabel.AutoSize = true;
-            startLabel.Location = new Point(142, 38);
-            Controls.Add(startLabel);
+            startLabel.Foreground = Brushes.White;
+            startLabel.FontSize = 12;
+            canvas.Children.Add(startLabel);
+            Canvas.SetLeft(startLabel, 142);
+            Canvas.SetTop(startLabel, 38);
 
-            minInput = new NumericUpDown();
-            minInput.Minimum = 0;
-            minInput.Maximum = 999;
-            minInput.Width = 50;
-            minInput.Location = new Point(204, 34);
-            minInput.BackColor = Color.FromArgb(28, 34, 40);
-            minInput.ForeColor = Color.White;
-            minInput.BorderStyle = BorderStyle.FixedSingle;
-            minInput.ValueChanged += delegate { if (!running) UpdateTimeDisplay(GetInputSeconds()); };
-            Controls.Add(minInput);
+            minInput = MakeTimeInput("0", 50);
+            canvas.Children.Add(minInput);
+            Canvas.SetLeft(minInput, 204);
+            Canvas.SetTop(minInput, 33);
 
-            Label colonLabel = new Label();
-            colonLabel.Text = "分";
-            colonLabel.AutoSize = true;
-            colonLabel.Location = new Point(258, 38);
-            Controls.Add(colonLabel);
+            TextBlock minuteLabel = MakeSmallLabel("分");
+            canvas.Children.Add(minuteLabel);
+            Canvas.SetLeft(minuteLabel, 258);
+            Canvas.SetTop(minuteLabel, 38);
 
-            secInput = new NumericUpDown();
-            secInput.Minimum = 0;
-            secInput.Maximum = 59;
-            secInput.Width = 46;
-            secInput.Location = new Point(276, 34);
-            secInput.BackColor = Color.FromArgb(28, 34, 40);
-            secInput.ForeColor = Color.White;
-            secInput.BorderStyle = BorderStyle.FixedSingle;
-            secInput.ValueChanged += delegate { if (!running) UpdateTimeDisplay(GetInputSeconds()); };
-            Controls.Add(secInput);
+            secInput = MakeTimeInput("0", 46);
+            canvas.Children.Add(secInput);
+            Canvas.SetLeft(secInput, 276);
+            Canvas.SetTop(secInput, 33);
 
-            Label secLabel = new Label();
-            secLabel.Text = "秒";
-            secLabel.AutoSize = true;
-            secLabel.Location = new Point(326, 38);
-            Controls.Add(secLabel);
+            TextBlock secondLabel = MakeSmallLabel("秒");
+            canvas.Children.Add(secondLabel);
+            Canvas.SetLeft(secondLabel, 326);
+            Canvas.SetTop(secondLabel, 38);
 
-            startButton = new Button();
-            startButton.Text = "开始";
-            startButton.FlatStyle = FlatStyle.Flat;
-            startButton.FlatAppearance.BorderColor = Color.FromArgb(110, 233, 183);
-            startButton.BackColor = Color.FromArgb(24, 74, 61);
-            startButton.ForeColor = Color.White;
-            startButton.Size = new Size(58, 26);
-            startButton.Location = new Point(350, 33);
+            startButton = MakeMainButton("开始", Color.FromRgb(24, 74, 61), Color.FromRgb(110, 233, 183));
             startButton.Click += StartButtonClick;
-            Controls.Add(startButton);
+            canvas.Children.Add(startButton);
+            Canvas.SetLeft(startButton, 350);
+            Canvas.SetTop(startButton, 32);
 
-            resetButton = new Button();
-            resetButton.Text = "重置";
-            resetButton.FlatStyle = FlatStyle.Flat;
-            resetButton.FlatAppearance.BorderColor = Color.FromArgb(245, 201, 95);
-            resetButton.BackColor = Color.FromArgb(78, 59, 26);
-            resetButton.ForeColor = Color.White;
-            resetButton.Size = new Size(58, 26);
-            resetButton.Location = new Point(414, 33);
+            resetButton = MakeMainButton("重置", Color.FromRgb(78, 59, 26), Color.FromRgb(245, 201, 95));
             resetButton.Click += ResetButtonClick;
-            Controls.Add(resetButton);
+            canvas.Children.Add(resetButton);
+            Canvas.SetLeft(resetButton, 414);
+            Canvas.SetTop(resetButton, 32);
 
-            tips = new ToolTip();
-            tips.SetToolTip(header, "按住拖动窗口");
-            tips.SetToolTip(timeLabel, "按住拖动窗口");
-            tips.SetToolTip(minimizeButton, "最小化到右下角托盘，计时和提醒会继续运行");
-            tips.SetToolTip(pinButton, "固定/取消固定在屏幕最上层");
-            tips.SetToolTip(opacitySlider, "拖动调整整个窗口透明度");
-            tips.SetToolTip(statusLabel, "提醒开关和鼠标穿透在右下角托盘图标右键菜单里");
-            UpdatePinButton();
+            statusText = new TextBlock();
+            statusText.Text = "已置顶 | 可拖动窗口";
+            statusText.Foreground = new SolidColorBrush(Color.FromRgb(180, 190, 200));
+            statusText.FontSize = 11;
+            statusText.Width = 360;
+            statusText.Height = 18;
+            canvas.Children.Add(statusText);
+            Canvas.SetLeft(statusText, 142);
+            Canvas.SetTop(statusText, 59);
 
-            ContextMenuStrip trayMenu = new ContextMenuStrip();
-            ToolStripMenuItem showItem = new ToolStripMenuItem("显示窗口");
+            ToolTipService.SetToolTip(opacitySlider, "拖动调整背景透明度，不影响按钮和时间显示");
+            ToolTipService.SetToolTip(minimizeButton, "最小化到右下角托盘，计时和提醒会继续运行");
+            ToolTipService.SetToolTip(pinButton, "固定/取消固定在屏幕最上层");
+            ToolTipService.SetToolTip(statusText, "提醒开关和鼠标穿透在右下角托盘图标右键菜单里");
+
+            outerBorder.MouseEnter += delegate { outerBorder.BorderBrush = new SolidColorBrush(Color.FromRgb(245, 201, 95)); };
+            outerBorder.MouseLeave += delegate { outerBorder.BorderBrush = Brushes.Transparent; };
+            ApplyBackgroundOpacity();
+
+            Forms.ContextMenuStrip trayMenu = new Forms.ContextMenuStrip();
+            Forms.ToolStripMenuItem showItem = new Forms.ToolStripMenuItem("显示窗口");
             showItem.Click += delegate { ShowFromTray(); };
-            ToolStripMenuItem resetPositionItem = new ToolStripMenuItem("重置窗口位置");
+            Forms.ToolStripMenuItem resetPositionItem = new Forms.ToolStripMenuItem("重置窗口位置");
             resetPositionItem.Click += delegate { ResetWindowPosition(); };
-            trayClickThroughItem = new ToolStripMenuItem("开启鼠标穿透");
+            trayClickThroughItem = new Forms.ToolStripMenuItem("开启鼠标穿透");
             trayClickThroughItem.Click += delegate { SetClickThrough(!clickThroughEnabled); };
-            trayMinute40BeepItem = new ToolStripMenuItem("40秒屯野语音");
-            trayMinute40BeepItem.Click += delegate { ToggleMinute40Beep(); };
-            trayRuneVoiceItem = new ToolStripMenuItem("神符语音：奇数分30秒");
+            trayMinute40VoiceItem = new Forms.ToolStripMenuItem("40秒屯野语音");
+            trayMinute40VoiceItem.Click += delegate { ToggleMinute40Voice(); };
+            trayRuneVoiceItem = new Forms.ToolStripMenuItem("神符语音：奇数分30秒");
             trayRuneVoiceItem.Click += delegate { ToggleRuneVoice(); };
-            trayXpVoiceItem = new ToolStripMenuItem("经验符语音：每6分30秒");
+            trayXpVoiceItem = new Forms.ToolStripMenuItem("经验符语音：每6分30秒");
             trayXpVoiceItem.Click += delegate { ToggleXpVoice(); };
-            ToolStripMenuItem exitItem = new ToolStripMenuItem("退出");
+            Forms.ToolStripMenuItem exitItem = new Forms.ToolStripMenuItem("退出");
             exitItem.Click += delegate { Close(); };
             trayMenu.Items.Add(showItem);
             trayMenu.Items.Add(resetPositionItem);
-            trayMenu.Items.Add(new ToolStripSeparator());
+            trayMenu.Items.Add(new Forms.ToolStripSeparator());
             trayMenu.Items.Add(trayClickThroughItem);
-            trayMenu.Items.Add(new ToolStripSeparator());
-            trayMenu.Items.Add(trayMinute40BeepItem);
+            trayMenu.Items.Add(new Forms.ToolStripSeparator());
+            trayMenu.Items.Add(trayMinute40VoiceItem);
             trayMenu.Items.Add(trayRuneVoiceItem);
             trayMenu.Items.Add(trayXpVoiceItem);
-            trayMenu.Items.Add(new ToolStripSeparator());
+            trayMenu.Items.Add(new Forms.ToolStripSeparator());
             trayMenu.Items.Add(exitItem);
 
-            trayIcon = new NotifyIcon();
-            trayIcon.Icon = SystemIcons.Application;
+            trayIcon = new Forms.NotifyIcon();
+            trayIcon.Icon = Drawing.SystemIcons.Application;
             trayIcon.Text = "Dota Timer";
             trayIcon.ContextMenuStrip = trayMenu;
             trayIcon.Visible = true;
@@ -281,67 +256,93 @@ namespace DotaTimer
             UpdateTrayClickThroughText(false);
             UpdateTrayAlertTexts();
 
-            uiTimer = new Timer();
-            uiTimer.Interval = 200;
+            uiTimer = new DispatcherTimer();
+            uiTimer.Interval = TimeSpan.FromMilliseconds(200);
             uiTimer.Tick += UiTimerTick;
             uiTimer.Start();
 
             UpdateTimeDisplay(0);
         }
 
-        protected override void OnFormClosing(FormClosingEventArgs e)
+        protected override void OnClosed(EventArgs e)
         {
             if (trayIcon != null)
             {
                 trayIcon.Visible = false;
                 trayIcon.Dispose();
             }
-            base.OnFormClosing(e);
+            base.OnClosed(e);
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        private Button MakeHeaderButton(string text, Color background)
         {
-            base.OnPaint(e);
-            if (!hoverBorderVisible) return;
-
-            using (Pen pen = new Pen(Color.FromArgb(245, 201, 95), 2))
-            {
-                e.Graphics.DrawRectangle(pen, 1, 1, Width - 3, Height - 3);
-            }
+            Button button = new Button();
+            button.Content = text;
+            button.Width = 30;
+            button.Height = 24;
+            button.Foreground = Brushes.White;
+            button.Background = new SolidColorBrush(background);
+            button.BorderThickness = new Thickness(0);
+            button.FontFamily = new FontFamily("Segoe UI");
+            button.FontWeight = FontWeights.Bold;
+            button.FontSize = 12;
+            return button;
         }
 
-        private void UpdateHoverBorder()
+        private Button MakeMainButton(string text, Color background, Color border)
         {
-            bool shouldShow = ClientRectangle.Contains(PointToClient(Cursor.Position));
-            if (hoverBorderVisible == shouldShow) return;
-
-            hoverBorderVisible = shouldShow;
-            Invalidate();
+            Button button = new Button();
+            button.Content = text;
+            button.Width = 58;
+            button.Height = 26;
+            button.Foreground = Brushes.White;
+            button.Background = new SolidColorBrush(background);
+            button.BorderBrush = new SolidColorBrush(border);
+            button.BorderThickness = new Thickness(1);
+            button.FontFamily = new FontFamily("Microsoft YaHei UI");
+            button.FontSize = 12;
+            return button;
         }
 
-        private void DragMouseDown(object sender, MouseEventArgs e)
+        private TextBox MakeTimeInput(string text, double width)
         {
-            if (e.Button != MouseButtons.Left) return;
-            dragging = true;
-            dragMouseStart = ((Control)sender).PointToScreen(e.Location);
-            dragFormStart = Location;
+            TextBox box = new TextBox();
+            box.Text = text;
+            box.Width = width;
+            box.Height = 24;
+            box.Foreground = Brushes.White;
+            box.Background = new SolidColorBrush(Color.FromRgb(28, 34, 40));
+            box.BorderBrush = new SolidColorBrush(Color.FromRgb(74, 84, 96));
+            box.HorizontalContentAlignment = HorizontalAlignment.Right;
+            box.VerticalContentAlignment = VerticalAlignment.Center;
+            box.FontSize = 12;
+            box.PreviewTextInput += DigitsOnly;
+            box.TextChanged += delegate { if (!running) UpdateTimeDisplay(GetInputSeconds()); };
+            return box;
         }
 
-        private void DragMouseMove(object sender, MouseEventArgs e)
+        private TextBlock MakeSmallLabel(string text)
         {
-            if (!dragging) return;
-            Point screen = ((Control)sender).PointToScreen(e.Location);
-            Location = new Point(
-                dragFormStart.X + screen.X - dragMouseStart.X,
-                dragFormStart.Y + screen.Y - dragMouseStart.Y);
+            TextBlock label = new TextBlock();
+            label.Text = text;
+            label.Foreground = Brushes.White;
+            label.FontSize = 12;
+            return label;
         }
 
-        private void DragMouseUp(object sender, MouseEventArgs e)
+        private void DigitsOnly(object sender, TextCompositionEventArgs e)
         {
-            dragging = false;
+            int ignored;
+            e.Handled = !int.TryParse(e.Text, out ignored);
         }
 
-        private void StartButtonClick(object sender, EventArgs e)
+        private void DragWindow(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Left) return;
+            try { DragMove(); } catch { }
+        }
+
+        private void StartButtonClick(object sender, RoutedEventArgs e)
         {
             if (!running)
             {
@@ -349,32 +350,31 @@ namespace DotaTimer
                 startedAt = DateTime.Now;
                 lastSecond = initialSeconds - 1;
                 running = true;
-                startButton.Text = "暂停";
-                statusLabel.Text = "计时中 | 提醒开关在右下角菜单";
+                startButton.Content = "暂停";
+                statusText.Text = "计时中 | 提醒开关在右下角菜单";
             }
             else
             {
                 initialSeconds = GetElapsedSeconds();
                 running = false;
-                startButton.Text = "继续";
-                statusLabel.Text = "已暂停";
+                startButton.Content = "继续";
+                statusText.Text = "已暂停";
                 SetInputFromSeconds(initialSeconds);
             }
         }
 
-        private void ResetButtonClick(object sender, EventArgs e)
+        private void ResetButtonClick(object sender, RoutedEventArgs e)
         {
             running = false;
-            startButton.Text = "开始";
+            startButton.Content = "开始";
             initialSeconds = GetInputSeconds();
             lastSecond = -1;
             UpdateTimeDisplay(initialSeconds);
-            statusLabel.Text = "已重置，可设置初始时间";
+            statusText.Text = "已重置，可设置初始时间";
         }
 
         private void UiTimerTick(object sender, EventArgs e)
         {
-            UpdateHoverBorder();
             int total = running ? GetElapsedSeconds() : GetInputSeconds();
             UpdateTimeDisplay(total);
 
@@ -387,7 +387,7 @@ namespace DotaTimer
 
         private int CurrentSecondsForResume()
         {
-            if (startButton.Text == "继续") return initialSeconds;
+            if (startButton.Content != null && startButton.Content.ToString() == "继续") return initialSeconds;
             return GetInputSeconds();
         }
 
@@ -398,22 +398,33 @@ namespace DotaTimer
 
         private int GetInputSeconds()
         {
-            return ((int)minInput.Value * 60) + (int)secInput.Value;
+            int minutes = ParseInput(minInput, 0, 999);
+            int seconds = ParseInput(secInput, 0, 59);
+            return minutes * 60 + seconds;
+        }
+
+        private int ParseInput(TextBox box, int min, int max)
+        {
+            int value;
+            if (!int.TryParse(box.Text, out value)) value = min;
+            if (value < min) value = min;
+            if (value > max) value = max;
+            return value;
         }
 
         private void SetInputFromSeconds(int total)
         {
             int minutes = Math.Min(999, Math.Max(0, total / 60));
             int seconds = Math.Max(0, total % 60);
-            minInput.Value = minutes;
-            secInput.Value = seconds;
+            minInput.Text = minutes.ToString();
+            secInput.Text = seconds.ToString();
         }
 
         private void UpdateTimeDisplay(int total)
         {
             int minutes = Math.Max(0, total / 60);
             int seconds = Math.Max(0, total % 60);
-            timeLabel.Text = minutes.ToString("00") + ":" + seconds.ToString("00");
+            timeText.Text = minutes.ToString("00") + ":" + seconds.ToString("00");
         }
 
         private void CheckAlerts(int total)
@@ -421,22 +432,22 @@ namespace DotaTimer
             int minute = total / 60;
             int second = total % 60;
 
-            if (second == 40 && minute40BeepEnabled)
+            if (second == 40 && minute40VoiceEnabled)
             {
                 SpeakAsync("屯野");
-                statusLabel.Text = "屯野提醒 " + FormatTime(total);
+                statusText.Text = "屯野提醒 " + FormatTime(total);
             }
 
             if (second == 30 && minute % 2 == 1 && runeVoiceEnabled)
             {
                 SpeakAsync("神符");
-                statusLabel.Text = "神符提醒 " + FormatTime(total);
+                statusText.Text = "神符提醒 " + FormatTime(total);
             }
 
             if (second == 30 && minute > 0 && minute % 6 == 0 && xpVoiceEnabled)
             {
                 SpeakAsync("经验符");
-                statusLabel.Text = "经验符提醒 " + FormatTime(total);
+                statusText.Text = "经验符提醒 " + FormatTime(total);
             }
         }
 
@@ -464,7 +475,6 @@ namespace DotaTimer
                 Type voiceType = Type.GetTypeFromProgID("SAPI.SpVoice");
                 if (voiceType == null) return;
                 object voice = Activator.CreateInstance(voiceType);
-                // SAPI flag 1 means asynchronous speech.
                 voiceType.InvokeMember("Speak", System.Reflection.BindingFlags.InvokeMethod, null, voice, new object[] { text, 1 });
             }
             catch
@@ -475,17 +485,18 @@ namespace DotaTimer
 
         private void ApplyClickThrough(bool enabled)
         {
-            int style = GetWindowLong(Handle, GWL_EXSTYLE);
+            IntPtr handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            int style = GetWindowLong(handle, GWL_EXSTYLE);
             clickThroughEnabled = enabled;
             if (enabled)
             {
-                SetWindowLong(Handle, GWL_EXSTYLE, style | WS_EX_TRANSPARENT);
-                statusLabel.Text = "鼠标穿透已开启；可从右下角托盘图标关闭";
+                SetWindowLong(handle, GWL_EXSTYLE, style | WS_EX_TRANSPARENT);
+                statusText.Text = "鼠标穿透已开启；可从右下角托盘图标关闭";
             }
             else
             {
-                SetWindowLong(Handle, GWL_EXSTYLE, style & ~WS_EX_TRANSPARENT);
-                statusLabel.Text = "鼠标穿透已关闭";
+                SetWindowLong(handle, GWL_EXSTYLE, style & ~WS_EX_TRANSPARENT);
+                statusText.Text = "鼠标穿透已关闭";
             }
             UpdateTrayClickThroughText(enabled);
         }
@@ -502,34 +513,34 @@ namespace DotaTimer
             trayClickThroughItem.Text = enabled ? "关闭鼠标穿透" : "开启鼠标穿透";
         }
 
-        private void ToggleMinute40Beep()
+        private void ToggleMinute40Voice()
         {
-            minute40BeepEnabled = !minute40BeepEnabled;
+            minute40VoiceEnabled = !minute40VoiceEnabled;
             UpdateTrayAlertTexts();
-            statusLabel.Text = "40秒屯野语音：" + OnOff(minute40BeepEnabled);
+            statusText.Text = "40秒屯野语音：" + OnOff(minute40VoiceEnabled);
         }
 
         private void ToggleRuneVoice()
         {
             runeVoiceEnabled = !runeVoiceEnabled;
             UpdateTrayAlertTexts();
-            statusLabel.Text = "神符语音：" + OnOff(runeVoiceEnabled);
+            statusText.Text = "神符语音：" + OnOff(runeVoiceEnabled);
         }
 
         private void ToggleXpVoice()
         {
             xpVoiceEnabled = !xpVoiceEnabled;
             UpdateTrayAlertTexts();
-            statusLabel.Text = "经验符语音：" + OnOff(xpVoiceEnabled);
+            statusText.Text = "经验符语音：" + OnOff(xpVoiceEnabled);
         }
 
         private void UpdateTrayAlertTexts()
         {
-            if (trayMinute40BeepItem == null) return;
-            trayMinute40BeepItem.Checked = minute40BeepEnabled;
+            if (trayMinute40VoiceItem == null) return;
+            trayMinute40VoiceItem.Checked = minute40VoiceEnabled;
             trayRuneVoiceItem.Checked = runeVoiceEnabled;
             trayXpVoiceItem.Checked = xpVoiceEnabled;
-            trayMinute40BeepItem.Text = "40秒屯野语音：" + OnOff(minute40BeepEnabled);
+            trayMinute40VoiceItem.Text = "40秒屯野语音：" + OnOff(minute40VoiceEnabled);
             trayRuneVoiceItem.Text = "神符语音：奇数分30秒 " + OnOff(runeVoiceEnabled);
             trayXpVoiceItem.Text = "经验符语音：每6分30秒 " + OnOff(xpVoiceEnabled);
         }
@@ -539,18 +550,20 @@ namespace DotaTimer
             return enabled ? "开" : "关";
         }
 
-        private void ApplyOpacityFromSlider()
+        private void ApplyBackgroundOpacity()
         {
-            if (opacitySlider == null) return;
-            Opacity = opacitySlider.Value / 100.0;
-            statusLabel.Text = "透明度：" + opacitySlider.Value + "%";
+            if (outerBorder == null || headerBorder == null || opacitySlider == null) return;
+            byte alpha = (byte)Math.Max(0, Math.Min(255, (int)(opacitySlider.Value * 255 / 100)));
+            outerBorder.Background = new SolidColorBrush(Color.FromArgb(alpha, 20, 24, 28));
+            headerBorder.Background = new SolidColorBrush(Color.FromArgb(alpha, 36, 42, 50));
+            statusText.Text = "背景透明度：" + ((int)opacitySlider.Value) + "%";
         }
 
         private void ShowFromTray()
         {
             Show();
-            WindowState = FormWindowState.Normal;
-            TopMost = topMostEnabled;
+            WindowState = WindowState.Normal;
+            Topmost = topMostEnabled;
             Activate();
         }
 
@@ -568,25 +581,25 @@ namespace DotaTimer
         private void ToggleTopMost()
         {
             topMostEnabled = !topMostEnabled;
-            TopMost = topMostEnabled;
+            Topmost = topMostEnabled;
             UpdatePinButton();
-            statusLabel.Text = topMostEnabled ? "已固定在屏幕最上层" : "已取消最上层固定";
+            statusText.Text = topMostEnabled ? "已固定在屏幕最上层" : "已取消最上层固定";
         }
 
         private void UpdatePinButton()
         {
             if (pinButton == null) return;
-            pinButton.BackColor = topMostEnabled ? Color.FromArgb(126, 86, 22) : Color.FromArgb(62, 68, 76);
-            pinButton.Text = "钉";
+            pinButton.Background = new SolidColorBrush(topMostEnabled ? Color.FromRgb(126, 86, 22) : Color.FromRgb(62, 68, 76));
+            pinButton.Content = "钉";
         }
 
         private void ResetWindowPosition()
         {
-            Rectangle area = Screen.PrimaryScreen.WorkingArea;
-            Location = new Point(area.Right - Width - 24, area.Top + 80);
+            Rect area = SystemParameters.WorkArea;
+            Left = area.Right - Width - 24;
+            Top = area.Top + 80;
             ShowFromTray();
-            statusLabel.Text = "窗口位置已重置";
+            statusText.Text = "窗口位置已重置";
         }
     }
 }
-
