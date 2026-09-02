@@ -27,6 +27,7 @@ namespace DotaTimer
         private readonly Button resetButton;
         private readonly NumericUpDown minInput;
         private readonly NumericUpDown secInput;
+        private readonly HScrollBar opacitySlider;
         private readonly Timer uiTimer;
         private readonly ToolTip tips;
         private readonly NotifyIcon trayIcon;
@@ -92,6 +93,27 @@ namespace DotaTimer
             title.MouseMove += DragMouseMove;
             title.MouseUp += DragMouseUp;
             header.Controls.Add(title);
+
+            Label opacityLabel = new Label();
+            opacityLabel.Text = "透明";
+            opacityLabel.ForeColor = Color.FromArgb(210, 216, 224);
+            opacityLabel.AutoSize = true;
+            opacityLabel.Location = new Point(118, 7);
+            opacityLabel.MouseDown += DragMouseDown;
+            opacityLabel.MouseMove += DragMouseMove;
+            opacityLabel.MouseUp += DragMouseUp;
+            header.Controls.Add(opacityLabel);
+
+            opacitySlider = new HScrollBar();
+            opacitySlider.Minimum = 45;
+            opacitySlider.Maximum = 109;
+            opacitySlider.LargeChange = 10;
+            opacitySlider.SmallChange = 5;
+            opacitySlider.Value = 92;
+            opacitySlider.Size = new Size(120, 16);
+            opacitySlider.Location = new Point(156, 6);
+            opacitySlider.Scroll += delegate { ApplyOpacityFromSlider(); };
+            header.Controls.Add(opacitySlider);
 
             minimizeButton = new Button();
             minimizeButton.Text = "_";
@@ -220,6 +242,7 @@ namespace DotaTimer
             tips.SetToolTip(timeLabel, "按住拖动窗口");
             tips.SetToolTip(minimizeButton, "最小化到右下角托盘，计时和提醒会继续运行");
             tips.SetToolTip(pinButton, "固定/取消固定在屏幕最上层");
+            tips.SetToolTip(opacitySlider, "拖动调整整个窗口透明度");
             tips.SetToolTip(statusLabel, "提醒开关和鼠标穿透在右下角托盘图标右键菜单里");
             UpdatePinButton();
 
@@ -514,6 +537,13 @@ namespace DotaTimer
         private static string OnOff(bool enabled)
         {
             return enabled ? "开" : "关";
+        }
+
+        private void ApplyOpacityFromSlider()
+        {
+            if (opacitySlider == null) return;
+            Opacity = opacitySlider.Value / 100.0;
+            statusLabel.Text = "透明度：" + opacitySlider.Value + "%";
         }
 
         private void ShowFromTray()
