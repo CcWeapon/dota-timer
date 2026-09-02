@@ -38,6 +38,7 @@ namespace DotaTimer
         private bool running;
         private bool topMostEnabled = true;
         private bool clickThroughEnabled;
+        private bool hoverBorderVisible;
         private bool minute40BeepEnabled = true;
         private bool runeVoiceEnabled = true;
         private bool xpVoiceEnabled = true;
@@ -278,10 +279,21 @@ namespace DotaTimer
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
+            if (!hoverBorderVisible) return;
+
             using (Pen pen = new Pen(Color.FromArgb(245, 201, 95), 2))
             {
                 e.Graphics.DrawRectangle(pen, 1, 1, Width - 3, Height - 3);
             }
+        }
+
+        private void UpdateHoverBorder()
+        {
+            bool shouldShow = ClientRectangle.Contains(PointToClient(Cursor.Position));
+            if (hoverBorderVisible == shouldShow) return;
+
+            hoverBorderVisible = shouldShow;
+            Invalidate();
         }
 
         private void DragMouseDown(object sender, MouseEventArgs e)
@@ -339,6 +351,7 @@ namespace DotaTimer
 
         private void UiTimerTick(object sender, EventArgs e)
         {
+            UpdateHoverBorder();
             int total = running ? GetElapsedSeconds() : GetInputSeconds();
             UpdateTimeDisplay(total);
 
@@ -546,3 +559,4 @@ namespace DotaTimer
         }
     }
 }
+
