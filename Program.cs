@@ -21,6 +21,7 @@ namespace DotaTimer
     {
         private readonly Label timeLabel;
         private readonly Label statusLabel;
+        private readonly Button minimizeButton;
         private readonly Button pinButton;
         private readonly Button startButton;
         private readonly Button resetButton;
@@ -90,6 +91,19 @@ namespace DotaTimer
             title.MouseMove += DragMouseMove;
             title.MouseUp += DragMouseUp;
             header.Controls.Add(title);
+
+            minimizeButton = new Button();
+            minimizeButton.Text = "_";
+            minimizeButton.FlatStyle = FlatStyle.Flat;
+            minimizeButton.FlatAppearance.BorderSize = 0;
+            minimizeButton.BackColor = Color.FromArgb(62, 68, 76);
+            minimizeButton.ForeColor = Color.White;
+            minimizeButton.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point);
+            minimizeButton.Size = new Size(30, 24);
+            minimizeButton.Location = new Point(396, 2);
+            minimizeButton.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            minimizeButton.Click += delegate { MinimizeToTray(); };
+            header.Controls.Add(minimizeButton);
 
             pinButton = new Button();
             pinButton.Text = "钉";
@@ -203,6 +217,7 @@ namespace DotaTimer
             tips = new ToolTip();
             tips.SetToolTip(header, "按住拖动窗口");
             tips.SetToolTip(timeLabel, "按住拖动窗口");
+            tips.SetToolTip(minimizeButton, "最小化到右下角托盘，计时和提醒会继续运行");
             tips.SetToolTip(pinButton, "固定/取消固定在屏幕最上层");
             tips.SetToolTip(statusLabel, "提醒开关和鼠标穿透在右下角托盘图标右键菜单里");
             UpdatePinButton();
@@ -494,6 +509,17 @@ namespace DotaTimer
             WindowState = FormWindowState.Normal;
             TopMost = topMostEnabled;
             Activate();
+        }
+
+        private void MinimizeToTray()
+        {
+            Hide();
+            if (trayIcon != null)
+            {
+                trayIcon.BalloonTipTitle = "Dota Timer";
+                trayIcon.BalloonTipText = "已最小化到右下角，计时和提醒会继续运行。";
+                trayIcon.ShowBalloonTip(1200);
+            }
         }
 
         private void ToggleTopMost()
